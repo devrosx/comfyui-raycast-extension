@@ -32,7 +32,7 @@ Make sure your ComfyUI server is running and accessible.
 
 Test command:
 ```bash
-curl http://192.168.3.88:5000/system_stats
+
 ```
 
 ### 5. Build Extension
@@ -58,7 +58,7 @@ In Raycast:
 1. Open Settings (Cmd+,)
 2. Find "ComfyUI Image Processor"
 3. Set:
-   - **Server URL**: e.g. `http://192.168.3.88:5000`
+   - **Server URL**: e.g. `
    - **Workflows Path**: e.g. `~/Documents/ComfyUI/workflows`
    - **Output Suffix**: e.g. `_edited`
 
@@ -134,7 +134,7 @@ Create file `~/Documents/ComfyUI/workflows/test_workflow.json`:
 ### Server won't start
 - Verify URL in preferences
 - Check that ComfyUI is running
-- Try pinging server: `ping 192.168.3.88`
+- Try pinging server: `ping 
 
 ### Workflow not working
 - Open workflow in ComfyUI and export as API format
