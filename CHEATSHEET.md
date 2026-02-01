@@ -54,12 +54,12 @@ comfyui-image-processor/
 
 Configuration (Raycast Preferences)
 Required
-  •  serverUrl:  http://192.168.3.88:5000
+  •  serverUrl:  http://
   •  workflowsPath:  ~/Documents/ComfyUI/workflows
   •  outputSuffix:  _edited
 Optional (Home Assistant)
-  •  haUrlInternal:  http://192.168.3.114:8188
-  •  haUrlExternal:  http://188.75.144.234:8188
+  •  haUrlInternal:  http://
+  •  haUrlExternal:  http://
   •  haToken: (your token)
   •  comfyuiSwitch:  switch.comfyui
 Workflow File (JSON)
@@ -92,7 +92,7 @@ Extension is not imported
 Server is unavailable
 ✓ Verify that ComfyUI is running
 ✓ Check URL in preferences
-✓ Test:  curl http://192.168.3.88:5000/system_stats
+
 Workflow doesn't work
 ✓ Must contain LoadImage node
 ✓ Export from ComfyUI as "API Format"
