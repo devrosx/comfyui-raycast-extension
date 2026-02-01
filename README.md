@@ -80,7 +80,7 @@ This project converts the Python script `multiimage_edit.py` into a full-feature
 ### Required Settings (Raycast Preferences)
 
 ```
-Server URL:        http://192.168.3.88:5000
+Server URL:        http://
 Workflows Path:    ~/Documents/ComfyUI/workflows
 Output Suffix:     _edited
 ```
@@ -88,9 +88,9 @@ Output Suffix:     _edited
 ### Optional (Home Assistant)
 
 ```
-HA URL Internal:   http://192.168.3.114:8188
-HA URL External:   http://188.75.144.234:8188
-HA Token:          eyJhbGc...
+HA URL Internal:   http://
+HA URL External:   http://
+HA Token:          
 ComfyUI Switch:    switch.comfyui
 ```
 
