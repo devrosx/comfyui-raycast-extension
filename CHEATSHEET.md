@@ -1,84 +1,70 @@
 # 📝 ComfyUI Image Processor - Cheat Sheet
 
-## Rychlé příkazy
+## Quick Commands
 
-### Instalace
+### Installation
 ```bash
-./install.sh                 # Automatická instalace
-npm install                  # Manuální instalace závislostí
-npm run build                # Build pro production
-npm run dev                  # Development mód (hot reload)
-```
+./install.sh                 # Automatic installation
+npm install                  # Manual dependency installation
+npm run build                # Build for production
+npm run dev                  # Development mode (hot reload)
 
-### Vytvoření ikonky
-```bash
-./create-icon.sh             # Automatická konverze SVG → PNG
+Creating an Icon
 
-# Nebo manuálně:
+./create-icon.sh             # Automatic conversion from SVG → PNG
+
+# Or manually:
 convert -background none -resize 512x512 icon-template.svg command-icon.png
 rsvg-convert -w 512 -h 512 icon-template.svg -o command-icon.png
-```
 
-### Raycast příkazy
+Raycast Commands
+After importing to Raycast:
+  •  Process Images - Image Processing
+  •  Manage Workflows - Workflow file management
+Raycast Keyboard Shortcuts
+Process Images
+  •  Enter - Start processing
+  •  Cmd+R - Refresh workflow list
+Manage Workflows
+  •  Enter - Open workflow
+  •  Cmd+O - Open in Finder
+  •  Cmd+C - Copy path
+  •  Cmd+D - Duplicate workflow
+  •  Cmd+Delete - Delete workflow
+  •  Cmd+R - Refresh list
+  •  Cmd+Shift+O - Open workflow folder
+Project Structure
 
-Po importu do Raycastu:
-
-- `Process Images` - Zpracování obrázků
-- `Manage Workflows` - Správa workflow souborů
-
-### Klávesové zkratky v Raycastu
-
-#### Process Images
-- `Enter` - Spustit zpracování
-- `Cmd+R` - Obnovit seznam workflows
-
-#### Manage Workflows
-- `Enter` - Otevřít workflow
-- `Cmd+O` - Otevřít v Finderu
-- `Cmd+C` - Kopírovat cestu
-- `Cmd+D` - Duplikovat workflow
-- `Cmd+Delete` - Smazat workflow
-- `Cmd+R` - Obnovit seznam
-- `Cmd+Shift+O` - Otevřít složku s workflows
-
-## Struktura projektu
-
-```
 comfyui-image-processor/
 ├── src/
-│   ├── index.tsx               # Hlavní příkaz pro zpracování
-│   ├── manage-workflows.tsx    # Správa workflow
+│   ├── index.tsx               # Main processing command
+│   ├── manage-workflows.tsx    # Workflow management
 │   └── utils/
-│       └── comfyui.ts          # ComfyUI API funkce
-├── package.json                # NPM konfigurace
-├── tsconfig.json               # TypeScript konfigurace
-├── command-icon.png            # Ikonka (vytvořit)
-├── install.sh                  # Instalační script
-├── create-icon.sh              # Helper pro vytvoření ikonky
-├── icon-template.svg           # SVG šablona pro ikonku
-├── example-workflow.json       # Příklad workflow
-├── README.md                   # Kompletní dokumentace
-├── QUICKSTART.md               # Rychlý start
-└── ICON_README.md              # Info o ikonce
-```
+│       └── comfyui.ts          # ComfyUI API functions
+├── package.json                # NPM configuration
+├── tsconfig.json               # TypeScript configuration
+├── command-icon.png            # Icon (create it)
+├── install.sh                  # Installation script
+├── create-icon.sh              # Helper for creating icon
+├── icon-template.svg           # SVG template for icon
+├── example-workflow.json       # Example workflow
+├── README.md                   # Complete documentation
+├── QUICKSTART.md               # Quick start
+└── ICON_README.md              # Icon info
 
-## Konfigurace (Raycast Preferences)
+Configuration (Raycast Preferences)
+Required
+  •  serverUrl:  http://192.168.3.88:5000
+  •  workflowsPath:  ~/Documents/ComfyUI/workflows
+  •  outputSuffix:  _edited
+Optional (Home Assistant)
+  •  haUrlInternal:  http://192.168.3.114:8188
+  •  haUrlExternal:  http://188.75.144.234:8188
+  •  haToken: (your token)
+  •  comfyuiSwitch:  switch.comfyui
+Workflow File (JSON)
+Minimal structure:
 
-### Povinné
-- `serverUrl`: `http://192.168.3.88:5000`
-- `workflowsPath`: `~/Documents/ComfyUI/workflows`
-- `outputSuffix`: `_edited`
-
-### Volitelné (Home Assistant)
-- `haUrlInternal`: `http://192.168.3.114:8188`
-- `haUrlExternal`: `http://188.75.144.234:8188`
-- `haToken`: (váš token)
-- `comfyuiSwitch`: `switch.comfyui`
-
-## Workflow soubor (JSON)
-
-Minimální struktura:
-```json
 {
   "1": {
     "class_type": "LoadImage",
@@ -90,78 +76,58 @@ Minimální struktura:
     "_meta": { "title": "Positive Prompt" }
   }
 }
-```
 
-### Podporované node typy
+Supported Node Types
+LoadImage:
+  •  LoadImage - To load an image
+Prompt Nodes:
+  •  PrimitiveStringMultiline (field:  value)
+  •  CLIPTextEncode (field:  text)
+  •  ImpactWildcardProcessor (field:  wildcard_text)
+Common Issues
+Extension is not imported
+✓ Check  command-icon.png (must exist)
+✓ Run  npm run build
+✓ Restart Raycast
+Server is unavailable
+✓ Verify that ComfyUI is running
+✓ Check URL in preferences
+✓ Test:  curl http://192.168.3.88:5000/system_stats
+Workflow doesn't work
+✓ Must contain LoadImage node
+✓ Export from ComfyUI as "API Format"
+✓ Verify JSON syntax
+Prompt is not applied
+✓ Workflow must contain prompt node
+✓ Node must have correct  _meta.title (e.g., "Positive Prompt")
+✓ Check field name (text/value/wildcard_text)
+Python Version (original script)
 
-**LoadImage:**
-- `LoadImage` - Pro načtení obrázku
-
-**Prompt nody:**
-- `PrimitiveStringMultiline` (field: `value`)
-- `CLIPTextEncode` (field: `text`)
-- `ImpactWildcardProcessor` (field: `wildcard_text`)
-
-## Časté problémy
-
-### Extension se neimportuje
-✓ Zkontrolujte `command-icon.png` (musí existovat)
-✓ Spusťte `npm run build`
-✓ Restartujte Raycast
-
-### Server není dostupný
-✓ Ověřte že ComfyUI běží
-✓ Zkontrolujte URL v preferences
-✓ Test: `curl http://192.168.3.88:5000/system_stats`
-
-### Workflow nefunguje
-✓ Musí obsahovat LoadImage node
-✓ Exportujte z ComfyUI jako "API Format"
-✓ Ověřte JSON syntax
-
-### Prompt se neaplikuje
-✓ Workflow musí obsahovat prompt node
-✓ Node musí mít správný `_meta.title` (např. "Positive Prompt")
-✓ Zkontrolujte field name (text/value/wildcard_text)
-
-## Python verze (původní script)
-
-```bash
-# Základní použití
+# Basic usage
 python3 multiimage_edit.py workflow.json image.jpg
 
-# S vlastním promptem
+# With custom prompt
 python3 multiimage_edit.py workflow.json image.jpg -prompt "portrait photo"
 
-# Více obrázků
+# Multiple images
 python3 multiimage_edit.py workflow.json img1.jpg img2.jpg img3.jpg
 
-# Celá složka
+# Entire folder
 python3 multiimage_edit.py workflow.json ./images/
-```
 
-## Užitečné odkazy
-
-- [Raycast Docs](https://developers.raycast.com/)
-- [ComfyUI](https://github.com/comfyanonymous/ComfyUI)
-- [Node.js Download](https://nodejs.org/)
-- [Online SVG→PNG](https://cloudconvert.com/svg-to-png)
-
-## Tips & Tricks
-
-1. **Rychlý výběr obrázků**: Použijte Raycast File Actions (vyberte soubory v Finderu → Raycast → Process Images)
-
-2. **Vlastní keyboard shortcut**: Settings → Extensions → ComfyUI → Přiřaďte např. Cmd+Shift+I
-
-3. **Historie promptů**: Extension si pamatuje posledních 10 promptů
-
-4. **Batch processing**: Vyberte více obrázků najednou (Cmd+Click v file pickeru)
-
-5. **Workflow organizace**: Používejte popisné názvy:
-   - `portrait_enhance.json`
-   - `landscape_upscale.json`
-   - `photo_to_sketch.json`
-
-6. **Custom výstupní složka**: Upravte workflow a změňte SaveImage node path
-
-7. **Debug**: Raycast logy viz Cmd+Shift+L
+Useful Links
+  • Raycast Docs
+  • ComfyUI
+  • Node.js Download
+  • Online SVG→PNG
+Tips & Tricks
+  1.  Quick Image Selection: Use Raycast File Actions (select files in Finder → Raycast → Process Images)
+  2.  Custom Keyboard Shortcut: Settings → Extensions → ComfyUI → Assign e.g., Cmd+Shift+I
+  3.  Prompt History: Extension remembers the last 10 prompts
+  4.  Batch Processing: Select multiple images at once (Cmd+Click in file picker)
+  5.  Workflow Organization: Use descriptive names:
+  ▪  portrait_enhance.json
+  ▪  landscape_upscale.json
+  ▪  photo_to_sketch.json
+  6.  Custom Output Folder: Edit workflow and change SaveImage node path
+  7.  Debug: Raycast logs can be accessed via Cmd+Shift+L
