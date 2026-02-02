@@ -8,19 +8,19 @@
 /* eslint-disable @typescript-eslint/ban-types */
 
 type ExtensionPreferences = {
-  /** ComfyUI Server URL - URL address of the ComfyUI server */
+  /** ComfyUI Server URL - URL adresa ComfyUI serveru */
   "serverUrl": string,
-  /** Home Assistant URL (Internal) - Internal URL for Home Assistant */
+  /** Home Assistant URL (Internal) - Interní URL pro Home Assistant */
   "haUrlInternal": string,
-  /** Home Assistant URL (External) - External URL for Home Assistant */
+  /** Home Assistant URL (External) - Externí URL pro Home Assistant */
   "haUrlExternal": string,
-  /** Home Assistant Token - Authorization token for Home Assistant */
+  /** Home Assistant Token - Autorizační token pro Home Assistant */
   "haToken"?: string,
-  /** ComfyUI Switch Entity - Entity ID of the switch in Home Assistant */
+  /** ComfyUI Switch Entity - Entity ID přepínače v Home Assistant */
   "comfyuiSwitch": string,
-  /** Output Suffix - Suffix for output files */
+  /** Output Suffix - Přípona pro výstupní soubory */
   "outputSuffix": string,
-  /** Workflows Path - Path to the folder with workflow files */
+  /** Workflows Path - Cesta ke složce s workflow soubory */
   "workflowsPath": string
 }
 
@@ -30,6 +30,8 @@ declare type Preferences = ExtensionPreferences
 declare namespace Preferences {
   /** Preferences accessible in the `index` command */
   export type Index = ExtensionPreferences & {}
+  /** Preferences accessible in the `screenshot` command */
+  export type Screenshot = ExtensionPreferences & {}
   /** Preferences accessible in the `manage-workflows` command */
   export type ManageWorkflows = ExtensionPreferences & {}
 }
@@ -37,6 +39,8 @@ declare namespace Preferences {
 declare namespace Arguments {
   /** Arguments passed to the `index` command */
   export type Index = {}
+  /** Arguments passed to the `screenshot` command */
+  export type Screenshot = {}
   /** Arguments passed to the `manage-workflows` command */
   export type ManageWorkflows = {}
 }

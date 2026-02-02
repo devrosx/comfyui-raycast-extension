@@ -45,10 +45,12 @@ export default function Command() {
   const [finderFiles, setFinderFiles] = useState<string[]>([]);
   const [workflowParams, setWorkflowParams] = useState<WorkflowParameters>({});
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
+  const [screenshotFile, setScreenshotFile] = useState<string | null>(null);
 
   useEffect(() => {
     loadWorkflows();
     loadFinderFiles();
+    loadScreenshot();
   }, []);
 
   useEffect(() => {
@@ -56,6 +58,26 @@ export default function Command() {
       loadWorkflowParameters(selectedWorkflow);
     }
   }, [selectedWorkflow]);
+
+  async function loadScreenshot() {
+    try {
+      const path = await LocalStorage.getItem<string>("comfyui_screenshot_path");
+      if (path) {
+        setScreenshotFile(path);
+        setHasImages(true);
+        // Clear it so it doesn't persist
+        await LocalStorage.removeItem("comfyui_screenshot_path");
+        
+        await showToast({
+          style: Toast.Style.Success,
+          title: "Screenshot loaded",
+          message: "Ready to process",
+        });
+      }
+    } catch (error) {
+      // No screenshot, that's fine
+    }
+  }
 
   async function loadFinderFiles() {
     try {
@@ -96,7 +118,16 @@ export default function Command() {
   }
 
   async function handleSubmit(values: FormValues) {
-    let imagesToProcess = finderFiles.length > 0 ? finderFiles : (values.images || []);
+    // Determine which images to use: Screenshot, Finder selection, or manual selection
+    let imagesToProcess: string[] = [];
+    
+    if (screenshotFile) {
+      imagesToProcess = [screenshotFile];
+    } else if (finderFiles.length > 0) {
+      imagesToProcess = finderFiles;
+    } else {
+      imagesToProcess = values.images || [];
+    }
     
     if (imagesToProcess.length === 0 && !workflowParams.positivePrompt) {
       await showToast({
@@ -223,7 +254,12 @@ export default function Command() {
         </ActionPanel>
       }
     >
-      {finderFiles.length > 0 ? (
+      {screenshotFile ? (
+        <Form.Description
+          title="Screenshot"
+          text="Screenshot ready to process"
+        />
+      ) : finderFiles.length > 0 ? (
         <Form.Description
           title="Files from Finder"
           text={`Selected: ${finderFiles.length} file${finderFiles.length > 1 ? 's' : ''}`}

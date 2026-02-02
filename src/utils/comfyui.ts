@@ -6,6 +6,19 @@ import { createReadStream, existsSync } from "fs";
 import { basename } from "path";
 import { randomUUID } from "crypto";
 
+// Generate unique filename if file already exists
+function getUniqueFilename(basePath: string, suffix: string, extension: string): string {
+  let counter = 1;
+  let testPath = `${basePath}${suffix}${extension}`;
+  
+  while (existsSync(testPath)) {
+    testPath = `${basePath}${suffix}_${counter}${extension}`;
+    counter++;
+  }
+  
+  return testPath;
+}
+
 interface WorkflowNode {
   class_type?: string;
   inputs?: Record<string, any>;
@@ -465,8 +478,10 @@ async function downloadResults(
         if (originalPath.includes("/") && !originalPath.endsWith("generated")) {
           const dir = originalPath.substring(0, originalPath.lastIndexOf("/"));
           const baseName = basename(originalPath).replace(/\.[^.]+$/, ""); // Remove original extension
-          // Use ComfyUI's extension (might be different from input)
-          outputPath = `${dir}/${baseName}${outputSuffix}${comfyExt}`;
+          const basePathWithoutExt = `${dir}/${baseName}`;
+          
+          // Use unique filename to avoid overwriting
+          outputPath = getUniqueFilename(basePathWithoutExt, outputSuffix, comfyExt);
         } else {
           // Text2img workflow - use original ComfyUI filename
           const dir = originalPath.endsWith("generated") ? originalPath.replace("/generated", "") : originalPath;

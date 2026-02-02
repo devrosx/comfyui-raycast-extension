@@ -13,6 +13,12 @@
       "mode": "view"
     },
     {
+      "name": "screenshot",
+      "title": "Screenshot to ComfyUI",
+      "description": "Take screenshot and process with ComfyUI",
+      "mode": "no-view"
+    },
+    {
       "name": "manage-workflows",
       "title": "Manage Workflows",
       "description": "Manage ComfyUI workflow files",
@@ -25,7 +31,7 @@
       "type": "textfield",
       "required": true,
       "title": "ComfyUI Server URL",
-      "description": "URL address of the ComfyUI server",
+      "description": "URL adresa ComfyUI serveru",
       "default": "http://localhost:7860"
     },
     {
@@ -33,7 +39,7 @@
       "type": "textfield",
       "required": false,
       "title": "Home Assistant URL (Internal)",
-      "description": "Internal URL for Home Assistant",
+      "description": "Interní URL pro Home Assistant",
       "default": ""
     },
     {
@@ -41,7 +47,7 @@
       "type": "textfield",
       "required": false,
       "title": "Home Assistant URL (External)",
-      "description": "External URL for Home Assistant",
+      "description": "Externí URL pro Home Assistant",
       "default": ""
     },
     {
@@ -49,14 +55,14 @@
       "type": "password",
       "required": false,
       "title": "Home Assistant Token",
-      "description": "Authorization token for Home Assistant"
+      "description": "Autorizační token pro Home Assistant"
     },
     {
       "name": "comfyuiSwitch",
       "type": "textfield",
       "required": false,
       "title": "ComfyUI Switch Entity",
-      "description": "Entity ID of the switch in Home Assistant",
+      "description": "Entity ID přepínače v Home Assistant",
       "default": "switch.comfyui"
     },
     {
@@ -64,7 +70,7 @@
       "type": "textfield",
       "required": true,
       "title": "Output Suffix",
-      "description": "Suffix for output files",
+      "description": "Přípona pro výstupní soubory",
       "default": "_edited"
     },
     {
@@ -72,25 +78,21 @@
       "type": "textfield",
       "required": true,
       "title": "Workflows Path",
-      "description": "Path to the folder with workflow files",
+      "description": "Cesta ke složce s workflow soubory",
       "default": "~/Documents/ComfyUI/workflows"
     }
   ],
   "dependencies": {
     "@raycast/api": "^1.67.1",
     "@raycast/utils": "^1.12.5",
-    "form-data": "^4.0.0",
-    "node-fetch": "^3.3.2"
+    "node-fetch": "^3.3.2",
+    "form-data": "^4.0.0"
   },
   "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "@raycast/eslint-config": "^1.0.11",
+    "@raycast/eslint-config": "^1.0.8",
     "@types/node": "20.8.10",
     "@types/react": "18.2.27",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
-    "eslint": "^8.57.0",
-    "globals": "^17.3.0",
+    "eslint": "^8.51.0",
     "prettier": "^3.0.3",
     "typescript": "^5.2.2"
   },

@@ -1,63 +1,151 @@
-# 🔧 Fixes - Version 2.1
+# 🔧 Bugfixes - Version 2.4.1
 
-## ✅ What has been fixed:
+## ✅ Fixed Issues:
 
-### 1. **Saving files from text2img workflow** 
-**Problem:** When you only used a prompt (without input images), ComfyUI generated files like `z-image_00002_.png`, but the script did not save them.
+### 1. **Screenshot Command Not Working** 🐛
+**Problem:**
+- "Select area to capture" appeared
+- Nothing could be selected
+- "Screenshot failed" error
 
-**Solution:**
--  ✅ The script now retains the original name from ComfyUI
--  ✅ Files are saved to the selected output folder with their original name
--  ✅ Works for multiple generated images as well
+**Root Cause:**
+- Wrong `screencapture` parameters
+- Used `-s` flag which is invalid
+- Temp folder (`/tmp`) permissions issue
 
-### 2. **Finder Integration** 
-**Problem:** Right-clicking on files in Finder did not work - the action was not displayed.
+**Fix:**
+```typescript
+// OLD (broken):
+await execAsync(`screencapture -i -s "${screenshotPath}"`);
 
-**Solution:**
--  ✅ Added support for `getSelectedFinderItems()` API
--  ✅ The extension now correctly detects selected files from Finder
--  ✅ Works the same as the "Convert Images" extension
+// NEW (working):
+await execAsync(`screencapture -i -x "${screenshotPath}"`);
+```
+
+**Changes:**
+- ✅ Removed invalid `-s` flag
+- ✅ Added `-x` (no sound) instead
+- ✅ Changed save location to `~/Downloads` (more reliable)
+- ✅ Added proper wait time after closeMainWindow (300ms)
+- ✅ Better error handling for user cancellation
+
+### 2. **File Overwriting Issue** 🐛
+**Problem:**
+- When processing same image multiple times
+- `photo_edited.png` would overwrite previous `photo_edited.png`
+- Lost previous results
+
+**Fix:**
+Added automatic numbering:
+```
+photo.jpg → photo_edited.png
+photo.jpg → photo_edited_1.png  (if _edited exists)
+photo.jpg → photo_edited_2.png  (if _edited_1 exists)
+photo.jpg → photo_edited_3.png  (etc.)
+```
+
+**Implementation:**
+```typescript
+function getUniqueFilename(basePath: string, suffix: string, extension: string): string {
+  let counter = 1;
+  let testPath = `${basePath}${suffix}${extension}`;
+  
+  while (existsSync(testPath)) {
+    testPath = `${basePath}${suffix}_${counter}${extension}`;
+    counter++;
+  }
+  
+  return testPath;
+}
+```
 
 ---
 
-## 🎯 How it works now:
+## 🎯 How Screenshot Works Now:
 
-### Text2Image (without input images):
-1. ComfyUI Convert
-2. Do not select images
-3. Select output folder: ~/Pictures/AI_Generated
-4. Enter prompt: "sunset over ocean"
-5. ComfyUI generates: z-image_00001_.png, z-image_00002_.png
-6. ✅ Files are saved as:
-   ~/Pictures/AI_Generated/z-image_00001_.png
-   ~/Pictures/AI_Generated/z-image_00002_.png
+### Step-by-Step:
+```
+1. Run "Screenshot to ComfyUI"
+2. Raycast window closes
+3. Wait 300ms for window to fully close
+4. Show HUD: "Select area to capture"
+5. User selects area with mouse (drag rectangle)
+6. OR user presses ESC to cancel
+7. If cancelled → Show "Screenshot cancelled", exit
+8. If captured → Save to ~/Downloads/ComfyUI_Screenshot_[timestamp].png
+9. Store path in LocalStorage
+10. Show "✓ Screenshot captured! Opening ComfyUI Convert..."
+11. Wait 600ms
+12. Launch ComfyUI Convert
+13. ComfyUI Convert loads screenshot automatically
+```
 
-### Image2Image (with input images):
-1. Select: photo.jpg
-2. ComfyUI processes
-3. ✅ Saves as: photo_edited.jpg (next to the original)
-
-### Finder Action:
-1. Select images in Finder (Cmd+Click for multiple)
-2. Right-click → Raycast
-3. You should see: "Convert with ComfyUI"
-4. Click → select workflow
-5. ✅ Processes all selected files
+### Cancel Behavior:
+- Press **ESC** during selection → Clean exit, no errors
+- Close window during selection → Same as ESC
+- No annoying error messages!
 
 ---
 
-## 📦 Installation of the fix:
+## 🎯 How File Numbering Works:
+
+### Example Scenario:
+```bash
+# First processing
+photo.jpg → ComfyUI → photo_edited.png
+
+# Second processing (same photo)
+photo.jpg → ComfyUI → photo_edited_1.png  ✅
+
+# Third processing
+photo.jpg → ComfyUI → photo_edited_2.png  ✅
+
+# All versions preserved!
+$ ls
+photo.jpg
+photo_edited.png
+photo_edited_1.png
+photo_edited_2.png
+```
+
+### Works with any extension:
+```
+image.png → image_edited.png, image_edited_1.png, ...
+photo.jpg → photo_edited.webp, photo_edited_1.webp, ...
+```
+
+---
+
+## 🚀 Installation:
 
 ```bash
-# Navigate to the extension folder
-cd ~/Desktop/comfyui-raycast-extension  # or wherever you have it
-
-# Unzip the new ZIP (overwrites old files)
+cd ~/Desktop/comfyui-raycast-extension
 unzip -o ~/Downloads/comfyui-raycast-extension.zip
-
-# Clean reinstall
 rm -rf node_modules package-lock.json
 npm install
 npm run build
+```
 
+---
 
+## 🧪 Test Screenshot:
+
+```
+1. Open Raycast (Cmd+Space)
+2. Type "Screenshot to ComfyUI"
+3. Press Enter
+4. You should see cursor change to crosshair
+5. Click and drag to select area
+6. Release mouse
+7. ComfyUI Convert should open with "Screenshot ready to process"
+```
+
+If you still get errors, check:
+- macOS permissions (System Preferences → Privacy → Screen Recording → Raycast)
+- Downloads folder exists and is writable
+
+---
+
+**Version: 2.4.1**  
+**Date: 2026-02-02**  
+**Fixes: Screenshot command + File overwrite protection**
