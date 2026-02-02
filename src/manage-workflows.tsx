@@ -1,4 +1,3 @@
-/* eslint-disable */
 import React from "react";
 import {
   List,
@@ -45,7 +44,7 @@ export default function Command() {
     setIsLoading(true);
     try {
       const workflowsPath = preferences.workflowsPath.replace("~", homedir());
-
+      
       if (!existsSync(workflowsPath)) {
         await showToast({
           style: Toast.Style.Failure,
@@ -57,14 +56,14 @@ export default function Command() {
       }
 
       const items = await getWorkflows(workflowsPath);
-
+      
       // Získat dodatečné informace o každém workflow
       const enriched = await Promise.all(
         items.map(async (item) => {
           try {
             const stats = await fs.stat(item.path);
             const analysis = await analyzeWorkflow(item.path);
-
+            
             return {
               ...item,
               size: stats.size,
@@ -75,7 +74,7 @@ export default function Command() {
           } catch {
             return item;
           }
-        }),
+        })
       );
 
       setWorkflows(enriched);
@@ -125,15 +124,15 @@ export default function Command() {
       const newName = `${baseName}_copy.json`;
       const workflowsPath = preferences.workflowsPath.replace("~", homedir());
       const newPath = `${workflowsPath}/${newName}`;
-
+      
       await fs.writeFile(newPath, content, "utf-8");
-
+      
       await showToast({
         style: Toast.Style.Success,
         title: "Workflow duplicated",
         message: newName,
       });
-
+      
       await loadWorkflows();
     } catch (error) {
       await showToast({
@@ -153,9 +152,7 @@ export default function Command() {
 
   function formatDate(date?: Date): string {
     if (!date) return "?";
-    return (
-      date.toLocaleDateString("cs-CZ") + " " + date.toLocaleTimeString("cs-CZ")
-    );
+    return date.toLocaleDateString("cs-CZ") + " " + date.toLocaleTimeString("cs-CZ");
   }
 
   return (
@@ -187,10 +184,7 @@ export default function Command() {
             <ActionPanel>
               <Action.OpenWith path={workflow.path} />
               <Action.ShowInFinder path={workflow.path} />
-              <Action.CopyToClipboard
-                title="Copy Path"
-                content={workflow.path}
-              />
+              <Action.CopyToClipboard title="Copy path" content={workflow.path} />
               <Action
                 title="Duplicate"
                 icon={Icon.Duplicate}
@@ -205,17 +199,15 @@ export default function Command() {
                 shortcut={{ modifiers: ["cmd"], key: "delete" }}
               />
               <Action
-                title="Reload List"
+                title="Reload list"
                 icon={Icon.ArrowClockwise}
                 onAction={loadWorkflows}
                 shortcut={{ modifiers: ["cmd"], key: "r" }}
               />
               <Action
-                title="Open Folder"
+                title="Open folder"
                 icon={Icon.Folder}
-                onAction={() =>
-                  open(preferences.workflowsPath.replace("~", homedir()))
-                }
+                onAction={() => open(preferences.workflowsPath.replace("~", homedir()))}
                 shortcut={{ modifiers: ["cmd", "shift"], key: "o" }}
               />
             </ActionPanel>

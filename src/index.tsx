@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 import React from "react";
 import {
   Form,
@@ -15,11 +13,7 @@ import {
   getSelectedFinderItems,
 } from "@raycast/api";
 import { useState, useEffect } from "react";
-import {
-  processImages,
-  getWorkflows,
-  ensureServerRunning,
-} from "./utils/comfyui";
+import { processImages, getWorkflows, ensureServerRunning, extractWorkflowParameters, WorkflowParameters } from "./utils/comfyui";
 import { homedir } from "os";
 
 interface Preferences {
@@ -35,32 +29,38 @@ interface Preferences {
 interface FormValues {
   images: string[];
   workflow: string;
-  prompt?: string;
-  useCustomPrompt: boolean;
+  positivePrompt?: string;
+  negativePrompt?: string;
+  batchSize?: string;
+  width?: string;
+  height?: string;
   outputFolder?: string[];
 }
 
 export default function Command() {
   const preferences = getPreferenceValues<Preferences>();
-  const [workflows, setWorkflows] = useState<{ name: string; path: string }[]>(
-    [],
-  );
+  const [workflows, setWorkflows] = useState<{ name: string; path: string }[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [useCustomPrompt, setUseCustomPrompt] = useState(false);
-  const [recentPrompts, setRecentPrompts] = useState<string[]>([]);
   const [hasImages, setHasImages] = useState(false);
   const [finderFiles, setFinderFiles] = useState<string[]>([]);
+  const [workflowParams, setWorkflowParams] = useState<WorkflowParameters>({});
+  const [selectedWorkflow, setSelectedWorkflow] = useState<string>("");
 
   useEffect(() => {
     loadWorkflows();
-    loadRecentPrompts();
     loadFinderFiles();
   }, []);
+
+  useEffect(() => {
+    if (selectedWorkflow) {
+      loadWorkflowParameters(selectedWorkflow);
+    }
+  }, [selectedWorkflow]);
 
   async function loadFinderFiles() {
     try {
       const items = await getSelectedFinderItems();
-      const imagePaths = items.map((item) => item.path);
+      const imagePaths = items.map(item => item.path);
       if (imagePaths.length > 0) {
         setFinderFiles(imagePaths);
         setHasImages(true);
@@ -86,31 +86,23 @@ export default function Command() {
     }
   }
 
-  async function loadRecentPrompts() {
-    const stored = await LocalStorage.getItem<string>("recent-prompts");
-    if (stored) {
-      setRecentPrompts(JSON.parse(stored));
+  async function loadWorkflowParameters(workflowPath: string) {
+    try {
+      const params = await extractWorkflowParameters(workflowPath);
+      setWorkflowParams(params);
+    } catch (error) {
+      setWorkflowParams({});
     }
   }
 
-  async function saveRecentPrompt(prompt: string) {
-    const updated = [
-      prompt,
-      ...recentPrompts.filter((p) => p !== prompt),
-    ].slice(0, 10);
-    setRecentPrompts(updated);
-    await LocalStorage.setItem("recent-prompts", JSON.stringify(updated));
-  }
-
   async function handleSubmit(values: FormValues) {
-    const imagesToProcess =
-      finderFiles.length > 0 ? finderFiles : values.images || [];
-
-    if (!values.useCustomPrompt && imagesToProcess.length === 0) {
+    let imagesToProcess = finderFiles.length > 0 ? finderFiles : (values.images || []);
+    
+    if (imagesToProcess.length === 0 && !workflowParams.positivePrompt) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Error",
-        message: "Select at least one image or use custom prompt",
+        message: "Select at least one image or workflow must have prompt",
       });
       return;
     }
@@ -124,10 +116,7 @@ export default function Command() {
       return;
     }
 
-    if (
-      imagesToProcess.length === 0 &&
-      (!values.outputFolder || values.outputFolder.length === 0)
-    ) {
+    if (imagesToProcess.length === 0 && (!values.outputFolder || values.outputFolder.length === 0)) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Error",
@@ -147,7 +136,7 @@ export default function Command() {
         preferences.haUrlInternal,
         preferences.haUrlExternal,
         preferences.haToken,
-        preferences.comfyuiSwitch,
+        preferences.comfyuiSwitch
       );
 
       if (!serverRunning) {
@@ -155,17 +144,16 @@ export default function Command() {
       }
 
       toast.title = "Processing...";
-
-      const prompt =
-        values.useCustomPrompt && values.prompt ? values.prompt : undefined;
-      const outputFolder =
-        values.outputFolder && values.outputFolder.length > 0
-          ? values.outputFolder[0]
-          : undefined;
-
-      if (prompt) {
-        await saveRecentPrompt(prompt);
-      }
+      
+      const outputFolder = values.outputFolder && values.outputFolder.length > 0 ? values.outputFolder[0] : undefined;
+      
+      // Build parameters from form
+      const params: WorkflowParameters = {};
+      if (values.positivePrompt !== undefined) params.positivePrompt = values.positivePrompt;
+      if (values.negativePrompt !== undefined) params.negativePrompt = values.negativePrompt;
+      if (values.batchSize) params.batchSize = parseInt(values.batchSize);
+      if (values.width) params.width = parseInt(values.width);
+      if (values.height) params.height = parseInt(values.height);
 
       if (imagesToProcess.length > 0) {
         toast.message = `0/${imagesToProcess.length}`;
@@ -176,19 +164,19 @@ export default function Command() {
         values.workflow,
         imagesToProcess,
         preferences.outputSuffix,
-        prompt,
+        params,
         (current, total) => {
           if (total > 0) {
             toast.message = `${current}/${total}`;
           }
         },
-        outputFolder,
+        outputFolder
       );
 
       toast.style = Toast.Style.Success;
       toast.title = `Done! Processed ${results.length} files`;
       toast.message = "Click to open folder";
-
+      
       toast.primaryAction = {
         title: "Open Folder",
         onAction: async () => {
@@ -207,6 +195,7 @@ export default function Command() {
           await showHUD("Paths copied");
         },
       };
+
     } catch (error) {
       toast.style = Toast.Style.Failure;
       toast.title = "Processing error";
@@ -220,24 +209,24 @@ export default function Command() {
     }
   };
 
+  const handleWorkflowChange = (path: string) => {
+    setSelectedWorkflow(path);
+  };
+
   return (
     <Form
       isLoading={isLoading}
       actions={
         <ActionPanel>
           <Action.SubmitForm title="Process Images" onSubmit={handleSubmit} />
-          <Action
-            title="Reload Workflows"
-            onAction={loadWorkflows}
-            shortcut={{ modifiers: ["cmd"], key: "r" }}
-          />
+          <Action title="Reload Workflows" onAction={loadWorkflows} shortcut={{ modifiers: ["cmd"], key: "r" }} />
         </ActionPanel>
       }
     >
       {finderFiles.length > 0 ? (
         <Form.Description
           title="Files from Finder"
-          text={`Selected: ${finderFiles.length} file${finderFiles.length > 1 ? "s" : ""}`}
+          text={`Selected: ${finderFiles.length} file${finderFiles.length > 1 ? 's' : ''}`}
         />
       ) : (
         <>
@@ -262,7 +251,7 @@ export default function Command() {
         </>
       )}
 
-      <Form.Dropdown id="workflow" title="Workflow">
+      <Form.Dropdown id="workflow" title="Workflow" onChange={handleWorkflowChange}>
         {workflows.map((wf) => (
           <Form.Dropdown.Item key={wf.path} value={wf.path} title={wf.name} />
         ))}
@@ -270,33 +259,65 @@ export default function Command() {
 
       <Form.Separator />
 
-      <Form.Checkbox
-        id="useCustomPrompt"
-        label="Use custom prompt"
-        value={useCustomPrompt}
-        onChange={setUseCustomPrompt}
-      />
+      {workflowParams.positivePrompt !== undefined && (
+        <Form.TextArea
+          id="positivePrompt"
+          title="Positive Prompt"
+          placeholder="Enter prompt..."
+          defaultValue={workflowParams.positivePrompt}
+        />
+      )}
 
-      {useCustomPrompt && (
+      {workflowParams.negativePrompt !== undefined && (
+        <Form.TextArea
+          id="negativePrompt"
+          title="Negative Prompt"
+          placeholder="Enter negative prompt..."
+          defaultValue={workflowParams.negativePrompt}
+        />
+      )}
+
+      {workflowParams.batchSize !== undefined && !isNaN(workflowParams.batchSize) && (
+        <Form.TextField
+          id="batchSize"
+          title="Batch Size"
+          placeholder="Number of images to generate"
+          defaultValue={String(workflowParams.batchSize)}
+        />
+      )}
+
+      {workflowParams.width !== undefined && !isNaN(workflowParams.width) && (
+        <Form.TextField
+          id="width"
+          title="Width"
+          placeholder="Image width"
+          defaultValue={String(workflowParams.width)}
+        />
+      )}
+
+      {workflowParams.height !== undefined && !isNaN(workflowParams.height) && (
+        <Form.TextField
+          id="height"
+          title="Height"
+          placeholder="Image height"
+          defaultValue={String(workflowParams.height)}
+        />
+      )}
+
+      {(workflowParams.clipName || workflowParams.vaeName || workflowParams.loraName || 
+        workflowParams.unetName || workflowParams.mode) && (
         <>
-          <Form.TextArea
-            id="prompt"
-            title="Prompt"
-            placeholder="Enter custom prompt for processing..."
+          <Form.Separator />
+          <Form.Description
+            title="Workflow Info"
+            text={[
+              workflowParams.clipName ? `Checkpoint: ${workflowParams.clipName}` : null,
+              workflowParams.vaeName ? `VAE: ${workflowParams.vaeName}` : null,
+              workflowParams.loraName ? `LoRA: ${workflowParams.loraName}` : null,
+              workflowParams.unetName ? `UNET: ${workflowParams.unetName}` : null,
+              workflowParams.mode ? `Mode: ${workflowParams.mode}` : null,
+            ].filter(Boolean).join('\n')}
           />
-
-          {recentPrompts.length > 0 && (
-            <Form.Dropdown id="recentPrompt" title="Recent Prompts" storeValue>
-              <Form.Dropdown.Item value="" title="(select prompt)" />
-              {recentPrompts.map((p, i) => (
-                <Form.Dropdown.Item
-                  key={i}
-                  value={p}
-                  title={p.length > 60 ? p.substring(0, 60) + "..." : p}
-                />
-              ))}
-            </Form.Dropdown>
-          )}
         </>
       )}
 

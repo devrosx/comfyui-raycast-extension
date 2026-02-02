@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { showToast, Toast } from "@raycast/api";
 import fetch from "node-fetch";
 import FormData from "form-data";
@@ -19,9 +18,7 @@ interface Workflow {
   [key: string]: WorkflowNode;
 }
 
-export async function getWorkflows(
-  workflowsPath: string,
-): Promise<{ name: string; path: string }[]> {
+export async function getWorkflows(workflowsPath: string): Promise<{ name: string; path: string }[]> {
   try {
     const files = await fs.readdir(workflowsPath);
     return files
@@ -65,6 +62,103 @@ export async function analyzeWorkflow(workflowPath: string): Promise<{
   }
 }
 
+export interface WorkflowParameters {
+  positivePrompt?: string;
+  negativePrompt?: string;
+  batchSize?: number;
+  width?: number;
+  height?: number;
+  clipName?: string;
+  vaeName?: string;
+  loraName?: string;
+  unetName?: string;
+  mode?: string;
+}
+
+export async function extractWorkflowParameters(workflowPath: string): Promise<WorkflowParameters> {
+  try {
+    const content = await fs.readFile(workflowPath, "utf-8");
+    const workflow: Workflow = JSON.parse(content);
+
+    const params: WorkflowParameters = {};
+
+    for (const node of Object.values(workflow)) {
+      // Extract prompts
+      if (node.class_type === "CLIPTextEncode" || 
+          node.class_type === "PrimitiveStringMultiline" ||
+          node.class_type === "ImpactWildcardProcessor") {
+        const title = node._meta?.title?.toLowerCase() || "";
+        const text = node.inputs?.text || node.inputs?.value || "";
+        
+        if (title.includes("positive") || title.includes("prompt")) {
+          if (!params.positivePrompt && text) {
+            params.positivePrompt = String(text);
+          }
+        } else if (title.includes("negative")) {
+          if (!params.negativePrompt && text) {
+            params.negativePrompt = String(text);
+          }
+        } else if (!params.positivePrompt && text) {
+          // First prompt without specific label = positive
+          params.positivePrompt = String(text);
+        }
+      }
+
+      // Extract batch_size from any node that has it
+      if (node.inputs?.batch_size !== undefined && !isNaN(Number(node.inputs.batch_size))) {
+        params.batchSize = Number(node.inputs.batch_size);
+      }
+
+      // Extract width and height from latent/image nodes
+      if (node.inputs?.width !== undefined && !isNaN(Number(node.inputs.width))) {
+        params.width = Number(node.inputs.width);
+      }
+      if (node.inputs?.height !== undefined && !isNaN(Number(node.inputs.height))) {
+        params.height = Number(node.inputs.height);
+      }
+
+      // Extract model information
+      // Checkpoint/CLIP
+      if (node.inputs?.ckpt_name && !params.clipName) {
+        params.clipName = String(node.inputs.ckpt_name);
+      }
+      if (node.inputs?.clip_name && !params.clipName) {
+        params.clipName = String(node.inputs.clip_name);
+      }
+
+      // VAE
+      if (node.inputs?.vae_name && !params.vaeName) {
+        params.vaeName = String(node.inputs.vae_name);
+      }
+
+      // LoRA
+      if (node.inputs?.lora_name && !params.loraName) {
+        params.loraName = String(node.inputs.lora_name);
+      }
+
+      // UNET/Model
+      if (node.inputs?.unet_name && !params.unetName) {
+        params.unetName = String(node.inputs.unet_name);
+      }
+      if (node.inputs?.model_name && !params.unetName) {
+        params.unetName = String(node.inputs.model_name);
+      }
+
+      // Mode/Sampler
+      if (node.inputs?.sampler_name && !params.mode) {
+        params.mode = String(node.inputs.sampler_name);
+      }
+      if (node.inputs?.scheduler && params.mode) {
+        params.mode += ` / ${node.inputs.scheduler}`;
+      }
+    }
+
+    return params;
+  } catch (error) {
+    return {};
+  }
+}
+
 async function checkServerAvailability(serverUrl: string): Promise<boolean> {
   try {
     const response = await fetch(`${serverUrl}/system_stats`, {
@@ -80,7 +174,7 @@ async function checkServerAvailability(serverUrl: string): Promise<boolean> {
 async function turnOnServer(
   haUrl?: string,
   haToken?: string,
-  switchEntity?: string,
+  switchEntity?: string
 ): Promise<boolean> {
   if (!haUrl || !haToken || !switchEntity) {
     return false;
@@ -90,7 +184,7 @@ async function turnOnServer(
     const response = await fetch(`${haUrl}/api/services/switch/turn_on`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${haToken}`,
+        "Authorization": `Bearer ${haToken}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
@@ -109,7 +203,7 @@ export async function ensureServerRunning(
   haUrlInternal?: string,
   haUrlExternal?: string,
   haToken?: string,
-  switchEntity?: string,
+  switchEntity?: string
 ): Promise<boolean> {
   // Zkontrolovat zda server už běží
   if (await checkServerAvailability(serverUrl)) {
@@ -124,12 +218,9 @@ export async function ensureServerRunning(
   });
 
   // Zkusit interní URL
-  if (
-    haUrlInternal &&
-    (await turnOnServer(haUrlInternal, haToken, switchEntity))
-  ) {
+  if (haUrlInternal && (await turnOnServer(haUrlInternal, haToken, switchEntity))) {
     toast.message = "Čekám na naběhnutí serveru...";
-
+    
     // Počkat až server naběhne (max 5 minut)
     for (let i = 0; i < 60; i++) {
       await new Promise((resolve) => setTimeout(resolve, 5000));
@@ -142,12 +233,9 @@ export async function ensureServerRunning(
   }
 
   // Zkusit externí URL jako fallback
-  if (
-    haUrlExternal &&
-    (await turnOnServer(haUrlExternal, haToken, switchEntity))
-  ) {
+  if (haUrlExternal && (await turnOnServer(haUrlExternal, haToken, switchEntity))) {
     toast.message = "Čekám na naběhnutí serveru...";
-
+    
     for (let i = 0; i < 60; i++) {
       await new Promise((resolve) => setTimeout(resolve, 5000));
       if (await checkServerAvailability(serverUrl)) {
@@ -164,10 +252,7 @@ export async function ensureServerRunning(
   return false;
 }
 
-async function uploadImage(
-  serverUrl: string,
-  imagePath: string,
-): Promise<string> {
+async function uploadImage(serverUrl: string, imagePath: string): Promise<string> {
   const formData = new FormData();
   formData.append("image", createReadStream(imagePath));
   formData.append("overwrite", "true");
@@ -187,7 +272,7 @@ async function uploadImage(
 
 function setWorkflowImage(workflow: Workflow, imageFilename: string): Workflow {
   const updated = { ...workflow };
-
+  
   for (const [nodeId, node] of Object.entries(updated)) {
     if (node.class_type === "LoadImage") {
       if (!node.inputs) {
@@ -196,7 +281,7 @@ function setWorkflowImage(workflow: Workflow, imageFilename: string): Workflow {
       node.inputs.image = imageFilename;
     }
   }
-
+  
   return updated;
 }
 
@@ -219,10 +304,7 @@ function setWorkflowPrompt(workflow: Workflow, promptText: string): Workflow {
         fieldName = "value";
       }
     } else if (classType === "CLIPTextEncode") {
-      if (
-        promptKeywords.some((kw) => metaTitle.includes(kw)) &&
-        !metaTitle.includes("negative")
-      ) {
+      if (promptKeywords.some((kw) => metaTitle.includes(kw)) && !metaTitle.includes("negative")) {
         isPromptNode = true;
         fieldName = "text";
       } else if (node.inputs && "text" in node.inputs) {
@@ -241,16 +323,72 @@ function setWorkflowPrompt(workflow: Workflow, promptText: string): Workflow {
         node.inputs = {};
       }
       node.inputs[fieldName] = promptText;
+      break;
     }
   }
 
   return updated;
 }
 
-async function sendWorkflow(
-  serverUrl: string,
-  workflow: Workflow,
-): Promise<string> {
+export function updateWorkflowParameters(
+  workflow: Workflow, 
+  params: {
+    positivePrompt?: string;
+    negativePrompt?: string;
+    batchSize?: number;
+    width?: number;
+    height?: number;
+  }
+): Workflow {
+  const updated = { ...workflow };
+
+  for (const [nodeId, node] of Object.entries(updated)) {
+    const classType = node.class_type || "";
+    const metaTitle = (node._meta?.title || "").toLowerCase();
+
+    // Update prompts
+    if (classType === "CLIPTextEncode" || 
+        classType === "PrimitiveStringMultiline" ||
+        classType === "ImpactWildcardProcessor") {
+      
+      if (params.positivePrompt !== undefined) {
+        if (metaTitle.includes("positive") || metaTitle.includes("prompt")) {
+          if (!node.inputs) node.inputs = {};
+          const field = classType === "PrimitiveStringMultiline" ? "value" : 
+                       classType === "ImpactWildcardProcessor" ? "wildcard_text" : "text";
+          node.inputs[field] = params.positivePrompt;
+        }
+      }
+
+      if (params.negativePrompt !== undefined) {
+        if (metaTitle.includes("negative")) {
+          if (!node.inputs) node.inputs = {};
+          const field = classType === "PrimitiveStringMultiline" ? "value" : "text";
+          node.inputs[field] = params.negativePrompt;
+        }
+      }
+    }
+
+    // Update batch_size
+    if (params.batchSize !== undefined && node.inputs?.batch_size !== undefined) {
+      node.inputs.batch_size = params.batchSize;
+    }
+
+    // Update width
+    if (params.width !== undefined && node.inputs?.width !== undefined) {
+      node.inputs.width = params.width;
+    }
+
+    // Update height
+    if (params.height !== undefined && node.inputs?.height !== undefined) {
+      node.inputs.height = params.height;
+    }
+  }
+
+  return updated;
+}
+
+async function sendWorkflow(serverUrl: string, workflow: Workflow): Promise<string> {
   const clientId = randomUUID();
   const data = {
     prompt: workflow,
@@ -273,11 +411,7 @@ async function sendWorkflow(
   return result.prompt_id;
 }
 
-async function waitForCompletion(
-  serverUrl: string,
-  promptId: string,
-  timeout = 300000,
-): Promise<any> {
+async function waitForCompletion(serverUrl: string, promptId: string, timeout = 300000): Promise<any> {
   const startTime = Date.now();
 
   while (Date.now() - startTime < timeout) {
@@ -302,7 +436,7 @@ async function downloadResults(
   serverUrl: string,
   promptResult: any,
   originalPath: string,
-  outputSuffix: string,
+  outputSuffix: string
 ): Promise<string[]> {
   const outputs = promptResult.outputs;
   const results: string[] = [];
@@ -313,7 +447,7 @@ async function downloadResults(
       for (let i = 0; i < nodeData.images.length; i++) {
         const img = nodeData.images[i];
         const url = `${serverUrl}/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(
-          img.subfolder || "",
+          img.subfolder || ""
         )}&type=${encodeURIComponent(img.type)}`;
 
         const response = await fetch(url);
@@ -323,12 +457,10 @@ async function downloadResults(
 
         // Detect file extension from ComfyUI filename
         const comfyFilename = img.filename;
-        const comfyExt = comfyFilename.substring(
-          comfyFilename.lastIndexOf("."),
-        );
+        const comfyExt = comfyFilename.substring(comfyFilename.lastIndexOf("."));
 
         let outputPath: string;
-
+        
         // If we have original file (img2img workflow)
         if (originalPath.includes("/") && !originalPath.endsWith("generated")) {
           const dir = originalPath.substring(0, originalPath.lastIndexOf("/"));
@@ -337,9 +469,7 @@ async function downloadResults(
           outputPath = `${dir}/${baseName}${outputSuffix}${comfyExt}`;
         } else {
           // Text2img workflow - use original ComfyUI filename
-          const dir = originalPath.endsWith("generated")
-            ? originalPath.replace("/generated", "")
-            : originalPath;
+          const dir = originalPath.endsWith("generated") ? originalPath.replace("/generated", "") : originalPath;
           outputPath = `${dir}/${comfyFilename}`;
         }
 
@@ -357,38 +487,34 @@ export async function processImages(
   workflowPath: string,
   imagePaths: string[],
   outputSuffix: string,
-  promptText?: string,
+  workflowParams?: WorkflowParameters,
   onProgress?: (current: number, total: number) => void,
-  outputFolder?: string,
+  outputFolder?: string
 ): Promise<string[]> {
-  // Načíst workflow
+  // Load workflow
   const workflowContent = await fs.readFile(workflowPath, "utf-8");
   let workflow: Workflow = JSON.parse(workflowContent);
 
-  // Aplikovat prompt pokud je zadán
-  if (promptText) {
-    workflow = setWorkflowPrompt(workflow, promptText);
+  // Apply workflow parameters if provided
+  if (workflowParams) {
+    workflow = updateWorkflowParameters(workflow, workflowParams);
   }
 
   const allResults: string[] = [];
 
-  // Pokud nejsou žádné obrázky (jen prompt), vygeneruj jeden výstup
+  // If no images (text2img), generate output
   if (imagePaths.length === 0) {
-    // Odeslat workflow bez obrázku
     const promptId = await sendWorkflow(serverUrl, workflow);
-
-    // Počkat na dokončení
     const promptResult = await waitForCompletion(serverUrl, promptId);
-
-    // Stáhnout výsledky do specifikované složky
+    
     const results = await downloadResults(
-      serverUrl,
-      promptResult,
-      outputFolder ? `${outputFolder}/generated` : "generated",
-      outputSuffix,
+      serverUrl, 
+      promptResult, 
+      outputFolder ? `${outputFolder}/generated` : "generated", 
+      outputSuffix
     );
     allResults.push(...results);
-
+    
     if (onProgress) {
       onProgress(1, 1);
     }
@@ -410,12 +536,7 @@ export async function processImages(
       const promptResult = await waitForCompletion(serverUrl, promptId);
 
       // Stáhnout výsledky
-      const results = await downloadResults(
-        serverUrl,
-        promptResult,
-        imagePath,
-        outputSuffix,
-      );
+      const results = await downloadResults(serverUrl, promptResult, imagePath, outputSuffix);
       allResults.push(...results);
 
       // Update progress
