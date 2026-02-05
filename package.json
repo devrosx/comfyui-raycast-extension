@@ -32,7 +32,7 @@
       "required": true,
       "title": "ComfyUI Server URL",
       "description": "URL adresa ComfyUI serveru",
-      "default": "http://localhost:7860"
+      "default": ""
     },
     {
       "name": "haUrlInternal",

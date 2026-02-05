@@ -57,7 +57,8 @@ export async function analyzeWorkflow(workflowPath: string): Promise<{
     let hasPromptNode = false;
 
     for (const node of Object.values(workflow)) {
-      if (node.class_type === "LoadImage") {
+      // Support both LoadImage and LoadImages
+      if (node.class_type === "LoadImage" || node.class_type === "LoadImages") {
         hasLoadImage = true;
       }
       if (
@@ -86,6 +87,11 @@ export interface WorkflowParameters {
   loraName?: string;
   unetName?: string;
   mode?: string;
+  loadImageNodes?: Array<{
+    nodeId: string;
+    title: string;
+    inputKey: string;
+  }>;
 }
 
 export async function extractWorkflowParameters(workflowPath: string): Promise<WorkflowParameters> {
@@ -93,9 +99,22 @@ export async function extractWorkflowParameters(workflowPath: string): Promise<W
     const content = await fs.readFile(workflowPath, "utf-8");
     const workflow: Workflow = JSON.parse(content);
 
-    const params: WorkflowParameters = {};
+    const params: WorkflowParameters = {
+      loadImageNodes: [],
+    };
 
-    for (const node of Object.values(workflow)) {
+    for (const [nodeId, node] of Object.entries(workflow)) {
+      // Extract LoadImage nodes
+      if (node.class_type === "LoadImage" || node.class_type === "LoadImages") {
+        const title = node._meta?.title || `Load Image ${params.loadImageNodes!.length + 1}`;
+        const inputKey = node.class_type === "LoadImages" ? "images" : "image";
+        
+        params.loadImageNodes!.push({
+          nodeId,
+          title,
+          inputKey,
+        });
+      }
       // Extract prompts
       if (node.class_type === "CLIPTextEncode" || 
           node.class_type === "PrimitiveStringMultiline" ||
@@ -226,7 +245,7 @@ export async function ensureServerRunning(
   // Pokud neběží, zkusit ho zapnout přes HA
   const toast = await showToast({
     style: Toast.Style.Animated,
-    title: "Server není dostupný",
+    title: "Server not available",
     message: "Pokouším se zapnout...",
   });
 
@@ -239,7 +258,7 @@ export async function ensureServerRunning(
       await new Promise((resolve) => setTimeout(resolve, 5000));
       if (await checkServerAvailability(serverUrl)) {
         toast.style = Toast.Style.Success;
-        toast.title = "Server je připraven";
+        toast.title = "Server is ready";
         return true;
       }
     }
@@ -253,15 +272,15 @@ export async function ensureServerRunning(
       await new Promise((resolve) => setTimeout(resolve, 5000));
       if (await checkServerAvailability(serverUrl)) {
         toast.style = Toast.Style.Success;
-        toast.title = "Server je připraven";
+        toast.title = "Server is ready";
         return true;
       }
     }
   }
 
   toast.style = Toast.Style.Failure;
-  toast.title = "Server není dostupný";
-  toast.message = "Zkontrolujte připojení";
+  toast.title = "Server not available";
+  toast.message = "Check connection";
   return false;
 }
 
@@ -276,7 +295,7 @@ async function uploadImage(serverUrl: string, imagePath: string): Promise<string
   });
 
   if (!response.ok) {
-    throw new Error(`Chyba uploadu: ${response.statusText}`);
+    throw new Error(`Upload error: ${response.statusText}`);
   }
 
   const result: any = await response.json();
@@ -287,11 +306,31 @@ function setWorkflowImage(workflow: Workflow, imageFilename: string): Workflow {
   const updated = { ...workflow };
   
   for (const [nodeId, node] of Object.entries(updated)) {
-    if (node.class_type === "LoadImage") {
+    if (node.class_type === "LoadImage" || node.class_type === "LoadImages") {
       if (!node.inputs) {
         node.inputs = {};
       }
-      node.inputs.image = imageFilename;
+      const inputKey = node.class_type === "LoadImages" ? "images" : "image";
+      node.inputs[inputKey] = imageFilename;
+      break; // Only set first LoadImage for single-image workflows
+    }
+  }
+  
+  return updated;
+}
+
+// New function: Set specific images to specific LoadImage nodes
+function setWorkflowImages(workflow: Workflow, imageMap: Record<string, string>): Workflow {
+  const updated = { ...workflow };
+  
+  for (const [nodeId, imageFilename] of Object.entries(imageMap)) {
+    const node = updated[nodeId];
+    if (node && (node.class_type === "LoadImage" || node.class_type === "LoadImages")) {
+      if (!node.inputs) {
+        node.inputs = {};
+      }
+      const inputKey = node.class_type === "LoadImages" ? "images" : "image";
+      node.inputs[inputKey] = imageFilename;
     }
   }
   
@@ -417,7 +456,7 @@ async function sendWorkflow(serverUrl: string, workflow: Workflow): Promise<stri
   });
 
   if (!response.ok) {
-    throw new Error(`Chyba odeslání workflow: ${response.statusText}`);
+    throw new Error(`Error sending workflow: ${response.statusText}`);
   }
 
   const result: any = await response.json();
@@ -442,7 +481,7 @@ async function waitForCompletion(serverUrl: string, promptId: string, timeout = 
     await new Promise((resolve) => setTimeout(resolve, 2000));
   }
 
-  throw new Error("Timeout při čekání na dokončení");
+  throw new Error("Timeout waiting for completion");
 }
 
 async function downloadResults(
@@ -500,7 +539,7 @@ async function downloadResults(
 export async function processImages(
   serverUrl: string,
   workflowPath: string,
-  imagePaths: string[],
+  imagePaths: string[] | Record<string, string[]>, // Can be array OR map of nodeId -> images
   outputSuffix: string,
   workflowParams?: WorkflowParameters,
   onProgress?: (current: number, total: number) => void,
@@ -517,46 +556,103 @@ export async function processImages(
 
   const allResults: string[] = [];
 
-  // If no images (text2img), generate output
-  if (imagePaths.length === 0) {
-    const promptId = await sendWorkflow(serverUrl, workflow);
-    const promptResult = await waitForCompletion(serverUrl, promptId);
+  // Check if we have image map (multiple LoadImage nodes) or simple array
+  const isImageMap = !Array.isArray(imagePaths) && typeof imagePaths === 'object';
+
+  if (isImageMap) {
+    // Multiple LoadImage nodes
+    const imageMap = imagePaths as Record<string, string[]>;
+    const nodeIds = Object.keys(imageMap);
     
-    const results = await downloadResults(
-      serverUrl, 
-      promptResult, 
-      outputFolder ? `${outputFolder}/generated` : "generated", 
-      outputSuffix
-    );
-    allResults.push(...results);
+    // Get first node ID and its images
+    const firstNodeId = nodeIds[0];
+    const firstNodeImages = imageMap[firstNodeId] || [];
     
-    if (onProgress) {
-      onProgress(1, 1);
+    // If first node has multiple images, process them sequentially
+    // Other nodes use the same single image for all iterations
+    const iterations = Math.max(1, firstNodeImages.length);
+    
+    for (let i = 0; i < iterations; i++) {
+      const uploadedMap: Record<string, string> = {};
+      
+      // Upload image for first node (iterate through all)
+      if (firstNodeImages.length > 0) {
+        const imageIndex = Math.min(i, firstNodeImages.length - 1);
+        const uploadedFilename = await uploadImage(serverUrl, firstNodeImages[imageIndex]);
+        uploadedMap[firstNodeId] = uploadedFilename;
+      }
+      
+      // Upload images for other nodes (same for all iterations)
+      for (let j = 1; j < nodeIds.length; j++) {
+        const nodeId = nodeIds[j];
+        const images = imageMap[nodeId];
+        if (images && images.length > 0) {
+          const uploadedFilename = await uploadImage(serverUrl, images[0]);
+          uploadedMap[nodeId] = uploadedFilename;
+        }
+      }
+      
+      // Set all images in workflow
+      const imageWorkflow = setWorkflowImages(workflow, uploadedMap);
+      
+      // Send workflow
+      const promptId = await sendWorkflow(serverUrl, imageWorkflow);
+      const promptResult = await waitForCompletion(serverUrl, promptId);
+      
+      // Use current first node image for output naming
+      const currentImage = firstNodeImages[Math.min(i, firstNodeImages.length - 1)] || "output";
+      const results = await downloadResults(serverUrl, promptResult, currentImage, outputSuffix);
+      allResults.push(...results);
+      
+      if (onProgress) {
+        onProgress(i + 1, iterations);
+      }
     }
   } else {
-    // Standardní zpracování s obrázky
-    for (let i = 0; i < imagePaths.length; i++) {
-      const imagePath = imagePaths[i];
-
-      // Upload obrázku
-      const uploadedFilename = await uploadImage(serverUrl, imagePath);
-
-      // Nastavit obrázek do workflow
-      const imageWorkflow = setWorkflowImage(workflow, uploadedFilename);
-
-      // Odeslat workflow
-      const promptId = await sendWorkflow(serverUrl, imageWorkflow);
-
-      // Počkat na dokončení
+    // Single LoadImage or no images
+    const imageArray = imagePaths as string[];
+    
+    if (imageArray.length === 0) {
+      // Text2img - no images
+      const promptId = await sendWorkflow(serverUrl, workflow);
       const promptResult = await waitForCompletion(serverUrl, promptId);
-
-      // Stáhnout výsledky
-      const results = await downloadResults(serverUrl, promptResult, imagePath, outputSuffix);
+      
+      const results = await downloadResults(
+        serverUrl, 
+        promptResult, 
+        outputFolder ? `${outputFolder}/generated` : "generated", 
+        outputSuffix
+      );
       allResults.push(...results);
-
-      // Update progress
+      
       if (onProgress) {
-        onProgress(i + 1, imagePaths.length);
+        onProgress(1, 1);
+      }
+    } else {
+      // Single LoadImage - batch processing
+      for (let i = 0; i < imageArray.length; i++) {
+        const imagePath = imageArray[i];
+
+        // Upload image
+        const uploadedFilename = await uploadImage(serverUrl, imagePath);
+
+        // Set image in workflow
+        const imageWorkflow = setWorkflowImage(workflow, uploadedFilename);
+
+        // Send workflow
+        const promptId = await sendWorkflow(serverUrl, imageWorkflow);
+
+        // Wait for completion
+        const promptResult = await waitForCompletion(serverUrl, promptId);
+
+        // Download results
+        const results = await downloadResults(serverUrl, promptResult, imagePath, outputSuffix);
+        allResults.push(...results);
+
+        // Update progress
+        if (onProgress) {
+          onProgress(i + 1, imageArray.length);
+        }
       }
     }
   }

@@ -1,25 +1,23 @@
 import { closeMainWindow, showHUD, LocalStorage, LaunchType, launchCommand, showToast, Toast } from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
-import { copyFile } from "fs/promises";
+import { copyFile, access } from "fs/promises";
 import { homedir } from "os";
 import { join } from "path";
+import { constants } from "fs";
 
 export default async function Command() {
   try {
     await closeMainWindow();
     await new Promise(resolve => setTimeout(resolve, 300));
 
-    // Use the exact same AppleScript pattern as Raycast's AI screenshot
+    // Use AppleScript to capture screenshot
     const script = `
-      -- Create temp file path
       set tempFolder to POSIX path of (path to temporary items)
       set timestamp to do shell script "date +%s"
       set screenshotFile to tempFolder & "comfyui_screenshot_" & timestamp & ".png"
       
-      -- Capture screenshot interactively
       do shell script "screencapture -i " & quoted form of screenshotFile
       
-      -- Check if file was created (user might have pressed ESC)
       try
         do shell script "test -f " & quoted form of screenshotFile
         return screenshotFile
@@ -31,7 +29,7 @@ export default async function Command() {
     const tempPath = await runAppleScript(script);
     
     if (!tempPath || tempPath.trim() === "") {
-      // User cancelled
+      // User cancelled (pressed ESC)
       return;
     }
 
@@ -41,6 +39,9 @@ export default async function Command() {
     
     try {
       await copyFile(tempPath.trim(), finalPath);
+      
+      // Verify file exists
+      await access(finalPath, constants.F_OK);
     } catch (err) {
       await showToast({
         style: Toast.Style.Failure,
@@ -53,8 +54,8 @@ export default async function Command() {
     // Store path for main command
     await LocalStorage.setItem("comfyui_screenshot_path", finalPath);
 
-    await showHUD("✓ Screenshot captured!");
-    await new Promise(resolve => setTimeout(resolve, 400));
+    await showHUD("✓ Screenshot captured! Opening ComfyUI Convert...");
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     // Launch main command
     await launchCommand({

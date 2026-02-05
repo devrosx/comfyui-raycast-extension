@@ -1,3 +1,0 @@
-# 🎉 New Features 
-- icon
-- fixes
