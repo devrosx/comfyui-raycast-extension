@@ -76,6 +76,14 @@ export async function analyzeWorkflow(workflowPath: string): Promise<{
   }
 }
 
+export interface LoraNode {
+  nodeId: string;
+  title: string;
+  loraName: string;
+  strengthModel: number;
+  strengthClip: number;
+}
+
 export interface WorkflowParameters {
   positivePrompt?: string;
   negativePrompt?: string;
@@ -92,6 +100,8 @@ export interface WorkflowParameters {
     title: string;
     inputKey: string;
   }>;
+  loraNodes?: LoraNode[];
+  loraUpdates?: Record<string, { strengthModel?: number; strengthClip?: number }>;
 }
 
 export async function extractWorkflowParameters(workflowPath: string): Promise<WorkflowParameters> {
@@ -101,6 +111,7 @@ export async function extractWorkflowParameters(workflowPath: string): Promise<W
 
     const params: WorkflowParameters = {
       loadImageNodes: [],
+      loraNodes: [],
     };
 
     for (const [nodeId, node] of Object.entries(workflow)) {
@@ -115,8 +126,26 @@ export async function extractWorkflowParameters(workflowPath: string): Promise<W
           inputKey,
         });
       }
+      // Extract LoRA loader nodes
+      if (node.class_type === "LoraLoader" || node.class_type === "LoraLoaderModelOnly" || node.class_type === "Power Lora Loader (rgthree)") {
+        const title = node._meta?.title || `LoRA ${params.loraNodes!.length + 1}`;
+        const loraName = node.inputs?.lora_name ? String(node.inputs.lora_name) : "";
+        const strengthModel = node.inputs?.strength_model !== undefined ? Number(node.inputs.strength_model) : 1.0;
+        const strengthClip = node.inputs?.strength_clip !== undefined ? Number(node.inputs.strength_clip) : 1.0;
+
+        if (loraName) {
+          params.loraNodes!.push({
+            nodeId,
+            title,
+            loraName,
+            strengthModel,
+            strengthClip,
+          });
+        }
+      }
+
       // Extract prompts
-      if (node.class_type === "CLIPTextEncode" || 
+      if (node.class_type === "CLIPTextEncode" ||
           node.class_type === "PrimitiveStringMultiline" ||
           node.class_type === "ImpactWildcardProcessor") {
         const title = node._meta?.title?.toLowerCase() || "";
@@ -383,13 +412,14 @@ function setWorkflowPrompt(workflow: Workflow, promptText: string): Workflow {
 }
 
 export function updateWorkflowParameters(
-  workflow: Workflow, 
+  workflow: Workflow,
   params: {
     positivePrompt?: string;
     negativePrompt?: string;
     batchSize?: number;
     width?: number;
     height?: number;
+    loraUpdates?: Record<string, { strengthModel?: number; strengthClip?: number }>;
   }
 ): Workflow {
   const updated = { ...workflow };
@@ -399,14 +429,14 @@ export function updateWorkflowParameters(
     const metaTitle = (node._meta?.title || "").toLowerCase();
 
     // Update prompts
-    if (classType === "CLIPTextEncode" || 
+    if (classType === "CLIPTextEncode" ||
         classType === "PrimitiveStringMultiline" ||
         classType === "ImpactWildcardProcessor") {
-      
+
       if (params.positivePrompt !== undefined) {
         if (metaTitle.includes("positive") || metaTitle.includes("prompt")) {
           if (!node.inputs) node.inputs = {};
-          const field = classType === "PrimitiveStringMultiline" ? "value" : 
+          const field = classType === "PrimitiveStringMultiline" ? "value" :
                        classType === "ImpactWildcardProcessor" ? "wildcard_text" : "text";
           node.inputs[field] = params.positivePrompt;
         }
@@ -418,6 +448,18 @@ export function updateWorkflowParameters(
           const field = classType === "PrimitiveStringMultiline" ? "value" : "text";
           node.inputs[field] = params.negativePrompt;
         }
+      }
+    }
+
+    // Update LoRA strength values
+    if (params.loraUpdates && params.loraUpdates[nodeId]) {
+      const loraUpdate = params.loraUpdates[nodeId];
+      if (!node.inputs) node.inputs = {};
+      if (loraUpdate.strengthModel !== undefined) {
+        node.inputs.strength_model = loraUpdate.strengthModel;
+      }
+      if (loraUpdate.strengthClip !== undefined) {
+        node.inputs.strength_clip = loraUpdate.strengthClip;
       }
     }
 

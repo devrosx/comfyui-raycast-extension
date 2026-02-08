@@ -11,12 +11,12 @@ import {
   Clipboard,
   showHUD,
   getSelectedFinderItems,
+  showInFinder,
   Icon,
 } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { processImages, getWorkflows, ensureServerRunning, extractWorkflowParameters, WorkflowParameters } from "./utils/comfyui";
 import { homedir } from "os";
-import { existsSync } from "fs";
 
 interface Preferences {
   serverUrl: string;
@@ -36,7 +36,7 @@ interface FormValues {
   width?: string;
   height?: string;
   outputFolder?: string[];
-  [key: string]: any;
+  [key: string]: any; // dynamic fields: loadimage_*, lora_strength_model_*, lora_strength_clip_*
 }
 
 interface PromptHistory {
@@ -320,7 +320,7 @@ export default function Command() {
       const params: WorkflowParameters = {};
       if (values.positivePrompt !== undefined) params.positivePrompt = values.positivePrompt;
       if (values.negativePrompt !== undefined) params.negativePrompt = values.negativePrompt;
-      
+
       if (values.width && values.width !== String(workflowParams.width)) {
         params.width = parseInt(values.width);
       }
@@ -328,6 +328,23 @@ export default function Command() {
         params.height = parseInt(values.height);
       }
       if (values.batchSize) params.batchSize = parseInt(values.batchSize);
+
+      // Collect LoRA strength overrides
+      if (workflowParams.loraNodes && workflowParams.loraNodes.length > 0) {
+        const loraUpdates: Record<string, { strengthModel?: number; strengthClip?: number }> = {};
+        for (const lora of workflowParams.loraNodes) {
+          const modelVal = values[`lora_strength_model_${lora.nodeId}`];
+          const clipVal = values[`lora_strength_clip_${lora.nodeId}`];
+          if (modelVal || clipVal) {
+            loraUpdates[lora.nodeId] = {};
+            if (modelVal) loraUpdates[lora.nodeId].strengthModel = parseFloat(modelVal);
+            if (clipVal) loraUpdates[lora.nodeId].strengthClip = parseFloat(clipVal);
+          }
+        }
+        if (Object.keys(loraUpdates).length > 0) {
+          params.loraUpdates = loraUpdates;
+        }
+      }
 
       await savePromptToHistory(values.positivePrompt, values.negativePrompt);
 
@@ -345,17 +362,20 @@ export default function Command() {
         outputFolder
       );
 
+      // Auto-reveal the first result in Finder
+      if (results.length > 0) {
+        await showInFinder(results[0]);
+      }
+
       toast.style = Toast.Style.Success;
-      toast.title = `✓ Done! ${results.length} file${results.length > 1 ? 's' : ''} processed`;
-      toast.message = screenshotFile ? "📁 Saved to ~/Downloads" : "Click to open folder";
-      
+      toast.title = `Done! ${results.length} file${results.length > 1 ? 's' : ''} processed`;
+      toast.message = results.length > 0 ? results[0].split('/').pop() : "";
+
       toast.primaryAction = {
-        title: "Open Folder",
+        title: "Open File",
         onAction: async () => {
           if (results.length > 0) {
-            const firstResult = results[0];
-            const dir = firstResult.substring(0, firstResult.lastIndexOf("/"));
-            await open(dir);
+            await open(results[0]);
           }
         },
       };
@@ -364,7 +384,7 @@ export default function Command() {
         title: "Copy Paths",
         onAction: async () => {
           await Clipboard.copy(results.join("\n"));
-          await showHUD("✓ Paths copied to clipboard");
+          await showHUD("Paths copied to clipboard");
         },
       };
 
@@ -579,7 +599,33 @@ export default function Command() {
         />
       )}
 
-      {selectedWorkflow && (workflowParams.clipName || workflowParams.vaeName || workflowParams.loraName || 
+      {selectedWorkflow && workflowParams.loraNodes && workflowParams.loraNodes.length > 0 && (
+        <>
+          <Form.Separator />
+          {workflowParams.loraNodes.map((lora) => (
+            <React.Fragment key={lora.nodeId}>
+              <Form.Description
+                title={lora.title}
+                text={lora.loraName}
+              />
+              <Form.TextField
+                id={`lora_strength_model_${lora.nodeId}`}
+                title="Model Strength"
+                placeholder={`Default: ${lora.strengthModel}`}
+                info="LoRA model strength (0.0 - 2.0)"
+              />
+              <Form.TextField
+                id={`lora_strength_clip_${lora.nodeId}`}
+                title="CLIP Strength"
+                placeholder={`Default: ${lora.strengthClip}`}
+                info="LoRA CLIP strength (0.0 - 2.0)"
+              />
+            </React.Fragment>
+          ))}
+        </>
+      )}
+
+      {selectedWorkflow && (workflowParams.clipName || workflowParams.vaeName || workflowParams.loraName ||
         workflowParams.unetName || workflowParams.mode) && (
         <>
           <Form.Separator />
