@@ -31,7 +31,7 @@
       "type": "textfield",
       "required": true,
       "title": "ComfyUI Server URL",
-      "description": "URL adresa ComfyUI serveru",
+      "description": "ComfyUI server URL address",
       "default": ""
     },
     {
@@ -39,7 +39,7 @@
       "type": "textfield",
       "required": false,
       "title": "Home Assistant URL (Internal)",
-      "description": "Interní URL pro Home Assistant",
+      "description": "Internal URL for Home Assistant",
       "default": ""
     },
     {
@@ -47,7 +47,7 @@
       "type": "textfield",
       "required": false,
       "title": "Home Assistant URL (External)",
-      "description": "Externí URL pro Home Assistant",
+      "description": "External URL for Home Assistant",
       "default": ""
     },
     {
@@ -55,14 +55,14 @@
       "type": "password",
       "required": false,
       "title": "Home Assistant Token",
-      "description": "Autorizační token pro Home Assistant"
+      "description": "Authorization token for Home Assistant"
     },
     {
       "name": "comfyuiSwitch",
       "type": "textfield",
       "required": false,
       "title": "ComfyUI Switch Entity",
-      "description": "Entity ID přepínače v Home Assistant",
+      "description": "Switch entity ID in Home Assistant",
       "default": "switch.comfyui"
     },
     {
@@ -70,7 +70,7 @@
       "type": "textfield",
       "required": true,
       "title": "Output Suffix",
-      "description": "Přípona pro výstupní soubory",
+      "description": "Suffix for output files",
       "default": "_edited"
     },
     {
@@ -78,7 +78,7 @@
       "type": "textfield",
       "required": true,
       "title": "Workflows Path",
-      "description": "Cesta ke složce s workflow soubory",
+      "description": "Path to folder with workflow files",
       "default": "~/Documents/ComfyUI/workflows"
     }
   ],

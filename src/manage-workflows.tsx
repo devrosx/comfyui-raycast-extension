@@ -14,9 +14,8 @@ import {
 } from "@raycast/api";
 import { useState, useEffect } from "react";
 import { getWorkflows, analyzeWorkflow } from "./utils/comfyui";
-import { homedir } from "os";
+import { resolvePath, formatFileSize, formatDate } from "./utils/common";
 import fs from "fs/promises";
-import { existsSync } from "fs";
 
 interface Preferences {
   workflowsPath: string;
@@ -43,27 +42,17 @@ export default function Command() {
   async function loadWorkflows() {
     setIsLoading(true);
     try {
-      const workflowsPath = preferences.workflowsPath.replace("~", homedir());
-      
-      if (!existsSync(workflowsPath)) {
-        await showToast({
-          style: Toast.Style.Failure,
-          title: "Folder does not exist",
-          message: `Create folder: ${workflowsPath}`,
-        });
-        setIsLoading(false);
-        return;
-      }
+      const workflowsPath = resolvePath(preferences.workflowsPath);
 
       const items = await getWorkflows(workflowsPath);
-      
-      // Získat dodatečné informace o každém workflow
+
+      // Get additional information about each workflow
       const enriched = await Promise.all(
         items.map(async (item) => {
           try {
             const stats = await fs.stat(item.path);
             const analysis = await analyzeWorkflow(item.path);
-            
+
             return {
               ...item,
               size: stats.size,
@@ -74,7 +63,7 @@ export default function Command() {
           } catch {
             return item;
           }
-        })
+        }),
       );
 
       setWorkflows(enriched);
@@ -122,17 +111,17 @@ export default function Command() {
       const content = await fs.readFile(workflow.path, "utf-8");
       const baseName = workflow.name.replace(".json", "");
       const newName = `${baseName}_copy.json`;
-      const workflowsPath = preferences.workflowsPath.replace("~", homedir());
+      const workflowsPath = resolvePath(preferences.workflowsPath);
       const newPath = `${workflowsPath}/${newName}`;
-      
+
       await fs.writeFile(newPath, content, "utf-8");
-      
+
       await showToast({
         style: Toast.Style.Success,
         title: "Workflow duplicated",
         message: newName,
       });
-      
+
       await loadWorkflows();
     } catch (error) {
       await showToast({
@@ -143,48 +132,43 @@ export default function Command() {
     }
   }
 
-  function formatFileSize(bytes?: number): string {
-    if (!bytes) return "?";
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  }
-
-  function formatDate(date?: Date): string {
-    if (!date) return "?";
-    return date.toLocaleDateString("cs-CZ") + " " + date.toLocaleTimeString("cs-CZ");
-  }
-
   return (
     <List isLoading={isLoading} searchBarPlaceholder="Search workflows...">
       {workflows.map((workflow) => (
         <List.Item
           key={workflow.path}
           title={workflow.name}
-          subtitle={formatFileSize(workflow.size)}
+          subtitle={
+            workflow.size ? formatFileSize(workflow.size) : "Unknown size"
+          }
           accessories={[
             {
               tag: {
-                value: workflow.hasLoadImage ? "✓ LoadImage" : "✗ LoadImage",
+                value: workflow.hasLoadImage ? "LoadImage" : "No LoadImage",
                 color: workflow.hasLoadImage ? Color.Green : Color.Red,
               },
             },
             {
               tag: {
-                value: workflow.hasPromptNode ? "✓ Prompt" : "✗ Prompt",
+                value: workflow.hasPromptNode ? "Prompt" : "No Prompt",
                 color: workflow.hasPromptNode ? Color.Green : Color.Yellow,
               },
             },
             {
               date: workflow.modified,
-              tooltip: `Modified: ${formatDate(workflow.modified)}`,
+              tooltip: workflow.modified
+                ? `Modified: ${formatDate(workflow.modified)}`
+                : "Unknown date",
             },
           ]}
           actions={
             <ActionPanel>
               <Action.OpenWith path={workflow.path} />
               <Action.ShowInFinder path={workflow.path} />
-              <Action.CopyToClipboard title="Copy path" content={workflow.path} />
+              <Action.CopyToClipboard
+                title="Copy Path"
+                content={workflow.path}
+              />
               <Action
                 title="Duplicate"
                 icon={Icon.Duplicate}
@@ -199,15 +183,15 @@ export default function Command() {
                 shortcut={{ modifiers: ["cmd"], key: "delete" }}
               />
               <Action
-                title="Reload list"
+                title="Reload List"
                 icon={Icon.ArrowClockwise}
                 onAction={loadWorkflows}
                 shortcut={{ modifiers: ["cmd"], key: "r" }}
               />
               <Action
-                title="Open folder"
+                title="Open Folder"
                 icon={Icon.Folder}
-                onAction={() => open(preferences.workflowsPath.replace("~", homedir()))}
+                onAction={() => open(resolvePath(preferences.workflowsPath))}
                 shortcut={{ modifiers: ["cmd", "shift"], key: "o" }}
               />
             </ActionPanel>
@@ -217,7 +201,7 @@ export default function Command() {
       {workflows.length === 0 && !isLoading && (
         <List.EmptyView
           title="No workflows"
-          description={`Přidejte .json workflows do:\n${preferences.workflowsPath}`}
+          description={`Add .json workflows to:\n${resolvePath(preferences.workflowsPath)}`}
           icon={Icon.Document}
         />
       )}

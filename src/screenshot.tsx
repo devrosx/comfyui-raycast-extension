@@ -1,4 +1,12 @@
-import { closeMainWindow, showHUD, LocalStorage, LaunchType, launchCommand, showToast, Toast } from "@raycast/api";
+import {
+  closeMainWindow,
+  showHUD,
+  LocalStorage,
+  LaunchType,
+  launchCommand,
+  showToast,
+  Toast,
+} from "@raycast/api";
 import { runAppleScript } from "@raycast/utils";
 import { copyFile, access } from "fs/promises";
 import { homedir } from "os";
@@ -8,7 +16,7 @@ import { constants } from "fs";
 export default async function Command() {
   try {
     await closeMainWindow();
-    await new Promise(resolve => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     // Use AppleScript to capture screenshot
     const script = `
@@ -27,7 +35,7 @@ export default async function Command() {
     `;
 
     const tempPath = await runAppleScript(script);
-    
+
     if (!tempPath || tempPath.trim() === "") {
       // User cancelled (pressed ESC)
       return;
@@ -35,18 +43,22 @@ export default async function Command() {
 
     // Copy to Downloads
     const timestamp = Date.now();
-    const finalPath = join(homedir(), "Downloads", `ComfyUI_Screenshot_${timestamp}.png`);
-    
+    const finalPath = join(
+      homedir(),
+      "Downloads",
+      `ComfyUI_Screenshot_${timestamp}.png`,
+    );
+
     try {
       await copyFile(tempPath.trim(), finalPath);
-      
+
       // Verify file exists
       await access(finalPath, constants.F_OK);
     } catch (err) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Failed to save screenshot",
-        message: String(err)
+        message: String(err),
       });
       return;
     }
@@ -55,21 +67,24 @@ export default async function Command() {
     await LocalStorage.setItem("comfyui_screenshot_path", finalPath);
 
     await showHUD("✓ Screenshot captured! Opening ComfyUI Convert...");
-    await new Promise(resolve => setTimeout(resolve, 500));
+    await new Promise((resolve) => setTimeout(resolve, 500));
 
     // Launch main command
     await launchCommand({
       name: "index",
       type: LaunchType.UserInitiated,
     });
-
-  } catch (error: any) {
+  } catch (error) {
     // Only show error if it's not a cancellation
-    if (!String(error).includes("cancelled") && !String(error).includes("User canceled")) {
+    const errorMessage = String(error);
+    if (
+      !errorMessage.includes("cancelled") &&
+      !errorMessage.includes("User canceled")
+    ) {
       await showToast({
         style: Toast.Style.Failure,
         title: "Screenshot error",
-        message: String(error)
+        message: errorMessage,
       });
     }
   }

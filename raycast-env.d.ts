@@ -8,19 +8,19 @@
 /* eslint-disable @typescript-eslint/ban-types */
 
 type ExtensionPreferences = {
-  /** ComfyUI Server URL - URL adresa ComfyUI serveru */
+  /** ComfyUI Server URL - ComfyUI server URL address */
   "serverUrl": string,
-  /** Home Assistant URL (Internal) - Interní URL pro Home Assistant */
+  /** Home Assistant URL (Internal) - Internal URL for Home Assistant */
   "haUrlInternal": string,
-  /** Home Assistant URL (External) - Externí URL pro Home Assistant */
+  /** Home Assistant URL (External) - External URL for Home Assistant */
   "haUrlExternal": string,
-  /** Home Assistant Token - Autorizační token pro Home Assistant */
+  /** Home Assistant Token - Authorization token for Home Assistant */
   "haToken"?: string,
-  /** ComfyUI Switch Entity - Entity ID přepínače v Home Assistant */
+  /** ComfyUI Switch Entity - Switch entity ID in Home Assistant */
   "comfyuiSwitch": string,
-  /** Output Suffix - Přípona pro výstupní soubory */
+  /** Output Suffix - Suffix for output files */
   "outputSuffix": string,
-  /** Workflows Path - Cesta ke složce s workflow soubory */
+  /** Workflows Path - Path to folder with workflow files */
   "workflowsPath": string
 }
 
